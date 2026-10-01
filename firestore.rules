@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email.matches('(?i)anandharajanbu7@gmail\\.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         (getUserData().role == 'admin' || getUserData().role == 'partner')) ||
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid))
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid != userId);
+    }
+
+    // Settings Collection
+    match /settings/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Work Entries - allows authenticated admins/partners to create, read, update, and delete
+    match /works/{workId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Expense Entries
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Drivers
+    match /drivers/{driverId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Driver Advances
+    match /driver_advances/{advanceId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Driver Salaries
+    match /driver_salaries/{salaryId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Machine Care
+    match /machine_care/{careId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    // Activity Log
+    match /activity_logs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated();
+    }
+
+    // Settlements
+    match /settlements/{settlementId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+  }
+}

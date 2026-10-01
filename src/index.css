@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+@theme {
+  --color-error-container: #ffdad6;
+  --color-on-surface-variant: #504535;
+  --color-on-tertiary: #ffffff;
+  --color-on-background: #1e1b17;
+  --color-on-primary-container: #4f3600;
+  --color-background: #fff8f2;
+  --color-on-secondary-fixed-variant: #005226;
+  --color-error: #ba1a1a;
+  --color-secondary-fixed: #a7f4b6;
+  --color-on-secondary: #ffffff;
+  --color-tertiary-fixed: #ffdad4;
+  --color-surface-container-highest: #e8e1d9;
+  --color-tertiary: #ae3022;
+  --color-tertiary-fixed-dim: #ffb4a8;
+  --color-surface-bright: #fff8f2;
+  --color-secondary: #206c3b;
+  --color-on-secondary-fixed: #00210c;
+  --color-secondary-fixed-dim: #8cd79b;
+  --color-primary-fixed: #ffdea9;
+  --color-on-tertiary-fixed: #410000;
+  --color-on-error: #ffffff;
+  --color-surface-container-high: #eee7df;
+  --color-on-primary-fixed-variant: #5f4100;
+  --color-outline-variant: #d4c4af;
+  --color-on-surface: #1e1b17;
+  --color-surface-container-low: #faf2ea;
+  --color-surface-variant: #e8e1d9;
+  --color-inverse-on-surface: #f7f0e7;
+  --color-surface-container-lowest: #ffffff;
+  --color-primary-fixed-dim: #fabc45;
+  --color-on-tertiary-fixed-variant: #8c160d;
+  --color-surface-dim: #e0d9d1;
+  --color-surface: #fff8f2;
+  --color-on-primary-fixed: #271900;
+  --color-on-secondary-container: #25703e;
+  --color-primary-container: #d49b24;
+  --color-surface-tint: #7d5800;
+  --color-tertiary-container: #ff7f6d;
+  --color-on-error-container: #93000a;
+  --color-on-primary: #ffffff;
+  --color-outline: #827563;
+  --color-secondary-container: #a4f1b3;
+  --color-primary: #7d5800;
+  --color-on-tertiary-container: #7b0603;
+  --color-surface-container: #f4ede5;
+  --color-inverse-primary: #fabc45;
+  --color-inverse-surface: #33302b;
+
+  --font-headline-md: "Bricolage Grotesque", sans-serif;
+  --font-display-lg-mobile: "Bricolage Grotesque", sans-serif;
+  --font-display-lg: "Bricolage Grotesque", sans-serif;
+  --font-label-md: "Work Sans", sans-serif;
+  --font-headline-sm: "Bricolage Grotesque", sans-serif;
+  --font-body-lg: "Work Sans", sans-serif;
+  --font-label-sm: "Work Sans", sans-serif;
+  --font-body-md: "Work Sans", sans-serif;
+  --font-body-sm: "Work Sans", sans-serif;
+  --font-headline-lg: "Bricolage Grotesque", sans-serif;
+  --font-currency-card: "Bricolage Grotesque", sans-serif;
+  --font-label-lg: "Work Sans", sans-serif;
+  --font-currency-hero: "Bricolage Grotesque", sans-serif;
+
+  --radius-DEFAULT: 1rem;
+  --radius-lg: 2rem;
+  --radius-xl: 3rem;
+  --radius-full: 9999px;
+
+  --spacing-gutter-mobile: 0.75rem;
+  --spacing-gutter: 1rem;
+  --spacing-space-md: 1rem;
+  --spacing-space-lg: 1.5rem;
+  --spacing-margin: 1.5rem;
+  --spacing-margin-mobile: 1rem;
+  --spacing-space-sm: 0.75rem;
+  --spacing-space-xs: 0.375rem;
+  --spacing-space-xl: 2.25rem;
+}
+
+@layer base {
+  html, body {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--color-surface, #fff8f2);
+    color: var(--color-on-surface, #1e1b17);
+    font-family: var(--font-body-md, "Work Sans", sans-serif);
+  }
+  
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    font-size: 24px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
