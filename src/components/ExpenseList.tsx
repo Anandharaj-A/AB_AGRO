@@ -15,6 +15,10 @@ export const ExpenseList: React.FC = () => {
     deleteExpenseEntry,
     updateExpenseEntry,
     businessSettings,
+    isPartner1,
+    isPartner2,
+    p1Name,
+    p2Name,
   } = useHarvester();
 
   const { canEdit, canDelete } = useAuth();
@@ -32,8 +36,8 @@ export const ExpenseList: React.FC = () => {
 
   const filteredExpenses = expenseEntries.filter((exp) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'p1') return (exp.paidBy || '').toLowerCase() === businessSettings.partner1Name.toLowerCase();
-    if (activeFilter === 'p2') return (exp.paidBy || '').toLowerCase() === businessSettings.partner2Name.toLowerCase();
+    if (activeFilter === 'p1') return isPartner1(exp.paidBy);
+    if (activeFilter === 'p2') return isPartner2(exp.paidBy);
     return exp.category === activeFilter;
   });
 
@@ -61,10 +65,13 @@ export const ExpenseList: React.FC = () => {
   const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingExpense) return;
+    const canonicalPayer = isPartner2(editingExpense.paidBy) ? p2Name : p1Name;
     await updateExpenseEntry(editingExpense.id, {
       ...editingExpense,
+      paidBy: canonicalPayer,
       amount: Number(editingExpense.amount) || 0,
     });
+    showToast(`Updated expense for ${canonicalPayer}`);
     setEditingExpense(null);
   };
 
@@ -90,7 +97,7 @@ export const ExpenseList: React.FC = () => {
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-surface-container-high">
           <div className="bg-surface-container-low p-2.5 rounded-xl">
             <span className="text-[11px] text-outline font-semibold block">
-              {businessSettings.partner1Name} Spent
+              {p1Name} Spent
             </span>
             <span className="font-headline-sm text-headline-sm text-secondary font-bold">
               ₹ {partner1Spent.toLocaleString('en-IN')}
@@ -99,7 +106,7 @@ export const ExpenseList: React.FC = () => {
 
           <div className="bg-surface-container-low p-2.5 rounded-xl">
             <span className="text-[11px] text-outline font-semibold block">
-              {businessSettings.partner2Name} Spent
+              {p2Name} Spent
             </span>
             <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
               ₹ {partner2Spent.toLocaleString('en-IN')}
@@ -155,7 +162,7 @@ export const ExpenseList: React.FC = () => {
               : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
           }`}
         >
-          By {businessSettings.partner1Name}
+          By {p1Name}
         </button>
 
         <button
@@ -167,7 +174,7 @@ export const ExpenseList: React.FC = () => {
               : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30'
           }`}
         >
-          By {businessSettings.partner2Name}
+          By {p2Name}
         </button>
       </div>
 
@@ -334,14 +341,40 @@ export const ExpenseList: React.FC = () => {
                 />
               </div>
 
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-on-surface">Paid By</label>
-                <input
-                  type="text"
-                  value={editingExpense.paidBy}
-                  onChange={(e) => setEditingExpense({ ...editingExpense, paidBy: e.target.value })}
-                  className="h-11 px-3 rounded-xl bg-surface-container text-xs text-on-surface"
-                />
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-bold text-on-surface">Paid By (Partner)</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingExpense({ ...editingExpense, paidBy: p1Name })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isPartner1(editingExpense.paidBy)
+                        ? 'bg-secondary-container/60 text-secondary border-secondary'
+                        : 'bg-surface-container text-on-surface-variant border-transparent'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person</span>
+                    <span>{p1Name}</span>
+                    {isPartner1(editingExpense.paidBy) && (
+                      <span className="material-symbols-outlined text-[14px]">check</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingExpense({ ...editingExpense, paidBy: p2Name })}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border flex items-center justify-center gap-1.5 cursor-pointer ${
+                      isPartner2(editingExpense.paidBy)
+                        ? 'bg-secondary-container/60 text-secondary border-secondary'
+                        : 'bg-surface-container text-on-surface-variant border-transparent'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">person</span>
+                    <span>{p2Name}</span>
+                    {isPartner2(editingExpense.paidBy) && (
+                      <span className="material-symbols-outlined text-[14px]">check</span>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-col gap-1">

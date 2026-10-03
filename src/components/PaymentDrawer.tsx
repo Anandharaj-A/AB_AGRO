@@ -18,25 +18,34 @@ export const PaymentDrawer: React.FC<PaymentDrawerProps> = ({
   onSuccess,
   onShareWhatsApp,
 }) => {
-  const { recordPayment, activePartnerView, businessSettings } = useHarvester();
+  const {
+    recordPayment,
+    activePartnerView,
+    businessSettings,
+    isPartner1,
+    isPartner2,
+    p1Name,
+    p2Name,
+  } = useHarvester();
   const [payAmount, setPayAmount] = useState<number | ''>('');
-  const [collector, setCollector] = useState<PartnerId>(activePartnerView || businessSettings.partner1Name || 'Anand');
+  const [collector, setCollector] = useState<PartnerId>(activePartnerView || p1Name);
   const [payMode, setPayMode] = useState<PaymentMode>('cash');
 
   useEffect(() => {
     if (workEntry) {
       setPayAmount(workEntry.balanceAmount > 0 ? workEntry.balanceAmount : '');
-      setCollector(activePartnerView || businessSettings.partner1Name || 'Anand');
+      setCollector(activePartnerView || p1Name);
       setPayMode('cash');
     }
-  }, [workEntry, activePartnerView, businessSettings]);
+  }, [workEntry, activePartnerView, p1Name]);
 
   if (!isOpen || !workEntry) return null;
 
   const handleSave = () => {
     const amount = Number(payAmount) || 0;
     if (amount <= 0) return;
-    recordPayment(workEntry.id, amount, collector);
+    const canonicalCollector = isPartner2(collector) ? p2Name : p1Name;
+    recordPayment(workEntry.id, amount, canonicalCollector, payMode);
     onSuccess(workEntry.farmerName, amount);
     onClose();
 
@@ -133,50 +142,50 @@ export const PaymentDrawer: React.FC<PaymentDrawerProps> = ({
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setCollector('anand')}
+              onClick={() => setCollector(p1Name)}
               className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer font-label-md text-label-md font-bold shadow-xs transition-all text-left ${
-                collector === 'anand'
+                isPartner1(collector)
                   ? 'bg-secondary-container/50 border-2 border-secondary text-on-secondary-container'
                   : 'bg-surface-container text-on-surface border-2 border-transparent'
               }`}
             >
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${
-                  collector === 'anand' ? 'bg-secondary' : 'bg-surface-container-highest'
+                  isPartner1(collector) ? 'bg-secondary' : 'bg-surface-container-highest'
                 }`}
               >
-                {collector === 'anand' && (
+                {isPartner1(collector) && (
                   <span className="material-symbols-outlined text-[14px]">
                     check
                   </span>
                 )}
               </div>
-              <span>Anand (You)</span>
+              <span>{p1Name}</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setCollector('boopathi')}
+              onClick={() => setCollector(p2Name)}
               className={`flex items-center gap-2 p-3 rounded-xl cursor-pointer font-label-md text-label-md font-bold shadow-xs transition-all text-left ${
-                collector === 'boopathi'
+                isPartner2(collector)
                   ? 'bg-secondary-container/50 border-2 border-secondary text-on-secondary-container'
                   : 'bg-surface-container text-on-surface border-2 border-transparent'
               }`}
             >
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${
-                  collector === 'boopathi'
+                  isPartner2(collector)
                     ? 'bg-secondary'
                     : 'bg-surface-container-highest'
                 }`}
               >
-                {collector === 'boopathi' && (
+                {isPartner2(collector) && (
                   <span className="material-symbols-outlined text-[14px]">
                     check
                   </span>
                 )}
               </div>
-              <span>Boopathi (Partner)</span>
+              <span>{p2Name}</span>
             </button>
           </div>
         </div>

@@ -6,15 +6,30 @@ import { PartnerAuditModal } from './PartnerAuditModal';
 export const ReportsScreen: React.FC = () => {
   const {
     totalIncome,
+    totalReceived,
     totalExpenses,
+    billedProfit,
+    cashProfit,
     netProfit,
     netProfitPartner1,
     netProfitPartner2,
-    totalPending,
-    totalWorkCount,
+    p1Name,
+    p2Name,
     partner1Spent,
     partner2Spent,
-    settlementOwed,
+    partner1Received,
+    partner2Received,
+    netAnand,
+    netBoopathi,
+    settlementDirective,
+    billedShare1,
+    billedShare2,
+    partner1AdvanceDeducted,
+    partner2AdvanceDeducted,
+    partner1RemainingShare,
+    partner2RemainingShare,
+    totalPending,
+    totalWorkCount,
     businessSettings,
     activePartnerView,
     setActivePartnerView,
@@ -26,25 +41,31 @@ export const ReportsScreen: React.FC = () => {
   const [isAuditOpen, setIsAuditOpen] = useState(false);
   const [copiedReport, setCopiedReport] = useState(false);
 
-  const p1 = businessSettings.partner1Name || 'Anand';
-  const p2 = businessSettings.partner2Name || 'Boopathi';
+  const p1 = p1Name;
+  const p2 = p2Name;
 
   const handleCopyReport = () => {
     const reportText = `📋 *${businessSettings.harvesterModel.toUpperCase()} (${businessSettings.registrationNumber}) - SEASON AUDIT REPORT*
 Partners: ${p1} (${businessSettings.profitSharePartner1}%) & ${p2} (${businessSettings.profitSharePartner2}%)
 Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
 
-💰 Total Harvest Revenue: ₹ ${totalIncome.toLocaleString('en-IN')}
+💰 Total Billed Income: ₹ ${totalIncome.toLocaleString('en-IN')}
+💵 Total Cash Collected: ₹ ${totalReceived.toLocaleString('en-IN')}
 🛠 Total Machine Expenses: ₹ ${totalExpenses.toLocaleString('en-IN')}
-📈 Net Seasonal Profit: ₹ ${netProfit.toLocaleString('en-IN')}
-🤝 ${p1}'s Share (${businessSettings.profitSharePartner1}%): ₹ ${netProfitPartner1.toLocaleString('en-IN')}
-🤝 ${p2}'s Share (${businessSettings.profitSharePartner2}%): ₹ ${netProfitPartner2.toLocaleString('en-IN')}
 ⏳ Outstanding Farmers Due: ₹ ${totalPending.toLocaleString('en-IN')}
 
-*Outlays from Pocket:*
-• ${p1} Outlay: ₹ ${partner1Spent.toLocaleString('en-IN')}
-• ${p2} Outlay: ₹ ${partner2Spent.toLocaleString('en-IN')}
-• Equalization Status: ${settlementOwed.amount > 0 ? `${settlementOwed.from} owes ${settlementOwed.to} ₹ ${settlementOwed.amount.toLocaleString('en-IN')}` : 'Accounts Fully Equalized'}`;
+📊 *PROFIT VIEWS:*
+• Cash Profit (In Hand): ₹ ${cashProfit.toLocaleString('en-IN')}
+• Billed Profit (On Paper): ₹ ${billedProfit.toLocaleString('en-IN')}
+
+🤝 *WHO RECEIVED & WHO SPENT:*
+• ${p1}: Received ₹ ${partner1Received.toLocaleString('en-IN')} | Spent ₹ ${partner1Spent.toLocaleString('en-IN')} | Net: ${netAnand >= 0 ? '+' : ''}₹ ${netAnand.toLocaleString('en-IN')}
+• ${p2}: Received ₹ ${partner2Received.toLocaleString('en-IN')} | Spent ₹ ${partner2Spent.toLocaleString('en-IN')} | Net: ${netBoopathi >= 0 ? '+' : ''}₹ ${netBoopathi.toLocaleString('en-IN')}
+• Settlement Directive: ${settlementDirective.text}
+
+💼 *PROFIT SHARE & ADVANCE ADJUSTMENT:*
+• ${p1}: 50% Paper Share ₹ ${billedShare1.toLocaleString('en-IN')} − Advance in Pocket ₹ ${partner1AdvanceDeducted.toLocaleString('en-IN')} = ₹ ${partner1RemainingShare.toLocaleString('en-IN')} Remaining
+• ${p2}: 50% Paper Share ₹ ${billedShare2.toLocaleString('en-IN')} − Advance in Pocket ₹ ${partner2AdvanceDeducted.toLocaleString('en-IN')} = ₹ ${partner2RemainingShare.toLocaleString('en-IN')} Remaining`;
 
     navigator.clipboard.writeText(reportText);
     setCopiedReport(true);

@@ -14,16 +14,45 @@ import { WorkEntry } from '../types';
 export const HomeDashboard: React.FC = () => {
   const {
     totalIncome,
+    totalReceived,
     totalExpenses,
+    billedProfit,
+    cashProfit,
     netProfit,
+    profitViewMode,
+    setProfitViewMode,
     netProfitPartner1,
     netProfitPartner2,
     totalPending,
     pendingCount,
     totalWorkCount,
+    p1Name,
+    p2Name,
     partner1Spent,
     partner2Spent,
-    settlementOwed,
+    partner1Received,
+    partner2Received,
+    partner1SettledOut,
+    partner1SettledIn,
+    partner2SettledOut,
+    partner2SettledIn,
+    netAnand,
+    netBoopathi,
+    totalNet,
+    fairShareAnand,
+    anandOwes,
+    settlementDirective,
+    settlePartnerAccount,
+    billedShare1,
+    billedShare2,
+    cashShare1,
+    cashShare2,
+    pendingShare1,
+    pendingShare2,
+    partner1AdvanceDeducted,
+    partner2AdvanceDeducted,
+    partner1RemainingShare,
+    partner2RemainingShare,
     workEntries,
     setCurrentScreen,
     selectedDate,
@@ -54,9 +83,6 @@ export const HomeDashboard: React.FC = () => {
   // Recent entries for active period or overall
   const displayWorks = filteredWorkEntries.length > 0 ? filteredWorkEntries : workEntries;
   const recentWorks = displayWorks.slice(0, 3);
-
-  const p1Name = businessSettings.partner1Name;
-  const p2Name = businessSettings.partner2Name;
 
   const currentPeriodTitle =
     dateFilterMode === 'all'
@@ -165,6 +191,34 @@ export const HomeDashboard: React.FC = () => {
         </section>
       )}
 
+      {/* View Toggle (Cash Profit in hand vs Billed Paper Profit) */}
+      <section className="bg-surface-container-lowest p-1.5 rounded-2xl border border-outline-variant/30 flex items-center gap-1 shadow-xs">
+        <button
+          type="button"
+          onClick={() => setProfitViewMode('cash')}
+          className={`flex-1 py-2 px-3 rounded-xl font-label-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            profitViewMode === 'cash'
+              ? 'bg-secondary text-on-secondary shadow-xs'
+              : 'text-on-surface-variant hover:bg-surface-container-low'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+          <span>Cash Profit (In Hand)</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setProfitViewMode('billed')}
+          className={`flex-1 py-2 px-3 rounded-xl font-label-md text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            profitViewMode === 'billed'
+              ? 'bg-secondary text-on-secondary shadow-xs'
+              : 'text-on-surface-variant hover:bg-surface-container-low'
+          }`}
+        >
+          <span className="material-symbols-outlined text-[16px]">description</span>
+          <span>Billed Profit (On Paper)</span>
+        </button>
+      </section>
+
       {/* 4 Big Metric Cards (2x2 Grid) */}
       <section className="grid grid-cols-2 gap-3">
         {/* Total Income */}
@@ -174,7 +228,7 @@ export const HomeDashboard: React.FC = () => {
         >
           <div className="flex items-center justify-between">
             <span className="font-label-sm text-label-sm text-on-surface-variant font-bold uppercase tracking-wider text-[11px]">
-              Total Income
+              Total Billed
             </span>
             <div className="w-8 h-8 rounded-full bg-secondary-container/50 flex items-center justify-center text-secondary">
               <span className="material-symbols-outlined text-[18px]">payments</span>
@@ -188,7 +242,7 @@ export const HomeDashboard: React.FC = () => {
           <div className="inline-flex items-center gap-1 bg-secondary-container/40 px-2 py-0.5 rounded-full w-fit">
             <span className="material-symbols-outlined text-secondary text-[14px]">check_circle</span>
             <span className="font-label-sm text-[11px] text-on-secondary-container font-bold">
-              {totalWorkCount} Customer Jobs
+              ₹ {totalReceived.toLocaleString('en-IN')} Collected
             </span>
           </div>
         </div>
@@ -218,14 +272,14 @@ export const HomeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Net Profit */}
+        {/* Net Profit (Cash vs Billed view) */}
         <div
           onClick={() => setIsAuditOpen(true)}
           className="bg-secondary-container/30 rounded-2xl p-4 shadow-xs flex flex-col justify-between min-h-[148px] border border-secondary/20 cursor-pointer hover:bg-secondary-container/40 transition-colors"
         >
           <div className="flex items-center justify-between">
             <span className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider text-[11px]">
-              Net Profit
+              {profitViewMode === 'cash' ? 'Cash Profit' : 'Billed Profit'}
             </span>
             <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-xs">
               <span className="material-symbols-outlined text-[18px]">trending_up</span>
@@ -233,12 +287,12 @@ export const HomeDashboard: React.FC = () => {
           </div>
           <div className="my-1">
             <p className="font-headline-lg text-headline-lg text-secondary tracking-tight font-extrabold">
-              ₹ {netProfit.toLocaleString('en-IN')}
+              {netProfit < 0 ? '−' : ''}₹ {Math.abs(netProfit).toLocaleString('en-IN')}
             </p>
           </div>
           <div className="inline-flex items-center gap-1 text-secondary">
             <span className="font-label-sm text-[11px] font-bold">
-              {businessSettings.profitSharePartner1}/{businessSettings.profitSharePartner2} Split
+              {profitViewMode === 'cash' ? 'Real Cash in Hand' : 'Paper Profit'} • Tap for Audit
             </span>
           </div>
         </div>
@@ -271,7 +325,7 @@ export const HomeDashboard: React.FC = () => {
       </section>
 
       {/* Partner Settlement Ledger Card */}
-      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-3 border border-outline-variant/30">
+      <section className="bg-surface-container-lowest rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-3.5 border border-outline-variant/30">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-full bg-primary-fixed/60 flex items-center justify-center text-on-primary-fixed">
@@ -281,75 +335,86 @@ export const HomeDashboard: React.FC = () => {
               <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
                 Partner Split ({businessSettings.profitSharePartner1}% - {businessSettings.profitSharePartner2}%)
               </h3>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Auto-calculated from paid receipts in Firestore
+              <p className="font-body-sm text-body-sm text-on-surface-variant text-xs">
+                Auto-calculated from cash collected, expenses, and settlements
               </p>
             </div>
           </div>
           <span className="bg-surface-container px-2.5 py-1 rounded-full font-label-sm text-label-sm text-on-surface-variant font-bold text-[11px]">
-            Live Cloud
+            Live Sync
           </span>
         </div>
 
-        {/* Partner Contributed Outlays */}
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <div className="bg-surface-container-low rounded-xl p-3 flex flex-col">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2 h-2 rounded-full bg-secondary"></div>
-              <span className="font-label-sm text-label-sm text-on-surface font-bold">
-                {p1Name} Spent
-              </span>
+        {/* Who Received & Who Spent (The Correct Partner Ledger) */}
+        <div className="flex flex-col gap-2">
+          <span className="font-label-sm text-label-sm font-bold text-on-surface uppercase tracking-wider text-xs">
+            Who Received &amp; Who Spent
+          </span>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Partner 1 (Anand) */}
+            <div className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-secondary"></div>
+                <span className="font-label-sm text-label-sm text-on-surface font-bold">
+                  {p1Name}
+                </span>
+              </div>
+              <div className="text-xs flex justify-between text-on-surface-variant">
+                <span>Received:</span>
+                <span className="font-bold text-on-surface">₹ {partner1Received.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs flex justify-between text-on-surface-variant">
+                <span>Spent:</span>
+                <span className="font-bold text-on-surface">₹ {partner1Spent.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs flex justify-between pt-1 border-t border-surface-container-high font-bold">
+                <span>Net Cash:</span>
+                <span className={netAnand >= 0 ? 'text-secondary' : 'text-error'}>
+                  {netAnand >= 0 ? '+' : '−'}₹ {Math.abs(netAnand).toLocaleString('en-IN')}
+                </span>
+              </div>
             </div>
-            <span className="font-headline-sm text-headline-sm text-on-surface font-extrabold">
-              ₹ {partner1Spent.toLocaleString('en-IN')}
-            </span>
-            <span className="font-body-sm text-body-sm text-on-surface-variant text-[11px] mt-0.5">
-              Machine Outlays
-            </span>
-          </div>
 
-          <div className="bg-surface-container-low rounded-xl p-3 flex flex-col">
-            <div className="flex items-center gap-1.5 mb-1">
-              <div className="w-2 h-2 rounded-full bg-primary-container"></div>
-              <span className="font-label-sm text-label-sm text-on-surface font-bold">
-                {p2Name} Spent
-              </span>
+            {/* Partner 2 (Boopathi) */}
+            <div className="bg-surface-container-low rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-primary-container"></div>
+                <span className="font-label-sm text-label-sm text-on-surface font-bold">
+                  {p2Name}
+                </span>
+              </div>
+              <div className="text-xs flex justify-between text-on-surface-variant">
+                <span>Received:</span>
+                <span className="font-bold text-on-surface">₹ {partner2Received.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs flex justify-between text-on-surface-variant">
+                <span>Spent:</span>
+                <span className="font-bold text-on-surface">₹ {partner2Spent.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="text-xs flex justify-between pt-1 border-t border-surface-container-high font-bold">
+                <span>Net Cash:</span>
+                <span className={netBoopathi >= 0 ? 'text-secondary' : 'text-error'}>
+                  {netBoopathi >= 0 ? '+' : '−'}₹ {Math.abs(netBoopathi).toLocaleString('en-IN')}
+                </span>
+              </div>
             </div>
-            <span className="font-headline-sm text-headline-sm text-on-surface font-extrabold">
-              ₹ {partner2Spent.toLocaleString('en-IN')}
-            </span>
-            <span className="font-body-sm text-body-sm text-on-surface-variant text-[11px] mt-0.5">
-              Machine Outlays
-            </span>
           </div>
         </div>
 
-        {/* Share Balance Bar */}
-        <div className="bg-surface-container-high/60 rounded-xl px-3.5 py-2 flex items-center justify-between text-on-surface">
-          <span className="font-body-sm text-body-sm font-medium">
-            Net Profit ({p1Name}: ₹{netProfitPartner1.toLocaleString('en-IN')} | {p2Name}: ₹{netProfitPartner2.toLocaleString('en-IN')})
-          </span>
-          <span className="font-headline-sm text-headline-sm text-secondary font-extrabold">
-            ₹ {netProfit.toLocaleString('en-IN')}
-          </span>
-        </div>
-
-        {/* Settlement Alert Highlight Box */}
+        {/* Settlement Directive Alert Highlight Box */}
         <div className="bg-primary-fixed/30 rounded-xl p-4 flex flex-col gap-3 border border-primary-fixed/40">
-          <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2.5">
             <span className="material-symbols-outlined text-primary text-[24px] mt-0.5">
               account_balance_wallet
             </span>
             <div className="flex flex-col">
               <p className="font-headline-sm text-headline-sm text-on-primary-fixed font-bold">
-                {settlementOwed.amount > 0
-                  ? `${settlementOwed.from} owes ${settlementOwed.to} ₹ ${settlementOwed.amount.toLocaleString('en-IN')}`
-                  : 'Partner Accounts Balanced!'}
+                {settlementDirective.text}
               </p>
               <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5 leading-relaxed text-xs">
-                {settlementOwed.amount > 0
-                  ? `${settlementOwed.to} paid ₹ ${settlementOwed.difference.toLocaleString('en-IN')} more in machine expenses. A payment of ₹ ${settlementOwed.amount.toLocaleString('en-IN')} equalizes partner accounts.`
-                  : `Both ${p1Name} and ${p2Name} have balanced outlays according to their agreed profit split.`}
+                {settlementDirective.isSettled
+                  ? `Both ${p1Name} and ${p2Name} cash positions and machine expenses are completely equalized (₹0 balance).`
+                  : `Fair share of combined net cash (${totalNet < 0 ? '−' : ''}₹${Math.abs(totalNet).toLocaleString('en-IN')}) is ${fairShareAnand < 0 ? '−' : ''}₹${Math.abs(Math.round(fairShareAnand)).toLocaleString('en-IN')} each. A transfer of ₹${settlementDirective.amount.toLocaleString('en-IN')} equalizes the accounts.`}
               </p>
             </div>
           </div>
@@ -360,14 +425,21 @@ export const HomeDashboard: React.FC = () => {
               onClick={() => setIsAuditOpen(true)}
               className="h-10 px-4 rounded-full bg-surface-container-lowest text-secondary font-label-md text-label-md font-bold shadow-xs active:scale-95 transition-transform flex items-center gap-1 cursor-pointer"
             >
-              <span>View Detailed Audit</span>
+              <span>Detailed Audit</span>
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
             </button>
 
-            {canEdit && settlementOwed.amount > 0 && (
+            {canEdit && !settlementDirective.isSettled && (
               <button
                 type="button"
-                onClick={() => setIsAuditOpen(true)}
+                onClick={async () => {
+                  await settlePartnerAccount(
+                    settlementDirective.from,
+                    settlementDirective.to,
+                    settlementDirective.amount
+                  );
+                  showToast(`Settlement Recorded: ${settlementDirective.text}`);
+                }}
                 className="h-10 px-4 rounded-full bg-secondary text-on-secondary font-label-md text-label-md font-bold shadow-xs active:scale-95 transition-transform flex items-center gap-1 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">done_all</span>
@@ -375,6 +447,68 @@ export const HomeDashboard: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+
+        {/* Profit Share Realization (50% - 50%) */}
+        <div className="bg-surface-container-low/70 rounded-xl p-3.5 flex flex-col gap-2.5 border border-outline-variant/20">
+          <div className="flex items-center justify-between">
+            <span className="font-label-sm text-xs font-bold text-on-surface uppercase tracking-wider">
+              Profit Share Realization ({businessSettings.profitSharePartner1}% - {businessSettings.profitSharePartner2}%)
+            </span>
+            <span className="text-[11px] text-outline font-semibold">
+              Net Profit: ₹{netProfit.toLocaleString('en-IN')}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 text-xs">
+            {/* Partner 1 (Anand) */}
+            <div className="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/20 flex flex-col gap-1">
+              <span className="font-bold text-on-surface block mb-0.5">{p1Name} ({businessSettings.profitSharePartner1}%)</span>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Profit Entitlement:</span>
+                <span className="font-bold text-on-surface">₹ {cashShare1.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Net Cash In Hand:</span>
+                <span className="font-bold text-secondary">
+                  ₹ {netAnand.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex justify-between text-[11px] pt-1 border-t border-surface-container font-bold">
+                <span>Remaining:</span>
+                <span className={partner1RemainingShare > 0 ? 'text-tertiary' : 'text-secondary'}>
+                  {partner1RemainingShare > 0 ? `₹ ${partner1RemainingShare.toLocaleString('en-IN')} due` : '✓ Fully Realized'}
+                </span>
+              </div>
+            </div>
+
+            {/* Partner 2 (Boopathi) */}
+            <div className="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/20 flex flex-col gap-1">
+              <span className="font-bold text-on-surface block mb-0.5">{p2Name} ({businessSettings.profitSharePartner2}%)</span>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Profit Entitlement:</span>
+                <span className="font-bold text-on-surface">₹ {cashShare2.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-on-surface-variant text-[11px]">
+                <span>Net Cash In Hand:</span>
+                <span className="font-bold text-secondary">
+                  ₹ {netBoopathi.toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex justify-between text-[11px] pt-1 border-t border-surface-container font-bold">
+                <span>Remaining:</span>
+                <span className={partner2RemainingShare > 0 ? 'text-tertiary' : 'text-secondary'}>
+                  {partner2RemainingShare > 0 ? `₹ ${partner2RemainingShare.toLocaleString('en-IN')} due` : '✓ Fully Realized'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-on-surface-variant leading-tight">
+            {settlementDirective.isSettled
+              ? `Both partners hold their exact ${businessSettings.profitSharePartner1}/${businessSettings.profitSharePartner2} share of cash profit (₹${cashShare1.toLocaleString('en-IN')} each). ${totalPending > 0 ? `Remaining ₹${totalPending.toLocaleString('en-IN')} will be distributed as pending dues are collected.` : 'All accounts are 100% equalized!'}`
+              : `To equalize partner profits to ₹${cashShare1.toLocaleString('en-IN')} each, ${settlementDirective.text}.`}
+          </p>
         </div>
       </section>
 

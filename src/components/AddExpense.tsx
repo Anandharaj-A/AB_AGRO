@@ -1,16 +1,26 @@
 import React, { useState } from 'react';
 import { useHarvester } from '../context/HarvesterContext';
-import { ExpenseCategory, PartnerId, PaymentMode, FuelLogDetails } from '../types';
+import { ExpenseCategory, ExpenseEntry, PartnerId, PaymentMode, FuelLogDetails } from '../types';
 import { HARVESTER_PHOTO_SQ, FUEL_RECEIPT_IMG } from '../mockData';
 import { formatDisplayDate, toISODateString, parseISODate } from '../utils/dateUtils';
 import { cleanNumberInput, formatInputDisplay } from '../utils/numberUtils';
 
 export const AddExpense: React.FC = () => {
-  const { addExpenseEntry, activePartnerView, setCurrentScreen, businessSettings } = useHarvester();
+  const {
+    addExpenseEntry,
+    activePartnerView,
+    setCurrentScreen,
+    businessSettings,
+    isPartner1,
+    isPartner2,
+    p1Name,
+    p2Name,
+  } = useHarvester();
 
   const [date, setDate] = useState(formatDisplayDate(new Date()));
   const [isoDate, setIsoDate] = useState(toISODateString(new Date()));
-  const [payer, setPayer] = useState<PartnerId>(activePartnerView || businessSettings.partner1Name || 'Anand');
+  const [payer, setPayer] = useState<string>(isPartner2(activePartnerView) ? p2Name : p1Name);
+  const [isSaving, setIsSaving] = useState(false);
   const [amount, setAmount] = useState<number | ''>(4500);
   const [category, setCategory] = useState<ExpenseCategory>('diesel');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('upi');
@@ -55,40 +65,57 @@ export const AddExpense: React.FC = () => {
     { id: 'other', label: 'Other', icon: 'more_horiz' },
   ];
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const numericAmount = Number(amount) || 0;
     if (numericAmount <= 0) {
       alert('Please enter a valid expense amount');
       return;
     }
 
-    addExpenseEntry({
-      date,
-      paidBy: payer,
-      category,
-      amount: numericAmount,
-      paymentMode,
-      fuelLog:
-        category === 'diesel'
-          ? {
-              ratePerLitre: Number(ratePerLitre) || 93.75,
-              litresFilled: Number(litresFilled) || 0,
-              harvestAreaAcres: Number(harvestArea) || 0,
-              litresPerAcre: Number(consumptionBenchmark) || 3.0,
-            }
-          : undefined,
-      receiptImage: hasReceipt ? receiptImage : undefined,
-      receiptFileName: hasReceipt ? receiptFileName : undefined,
-      remarks: remarks.trim(),
-      machinery: 'Kubota DC-68G (KA-04-E-2194)',
-      verified: true,
-    });
+    setIsSaving(true);
+    try {
+      const canonicalPayer = isPartner2(payer) ? p2Name : p1Name;
+      const expensePayload: Omit<ExpenseEntry, 'id'> = {
+        date,
+        paidBy: canonicalPayer,
+        category,
+        amount: numericAmount,
+        paymentMode,
+        remarks: remarks.trim(),
+        machinery: 'Kubota DC-68G (KA-04-E-2194)',
+        verified: true,
+      };
 
-    setToastMessage(`Expense Recorded • Ledger synchronized with ${payer === 'anand' ? 'Boopathi' : 'Anand'}`);
+      if (category === 'diesel') {
+        expensePayload.fuelLog = {
+          ratePerLitre: Number(ratePerLitre) || 93.75,
+          litresFilled: Number(litresFilled) || 0,
+          harvestAreaAcres: Number(harvestArea) || 0,
+          litresPerAcre: Number(consumptionBenchmark) || 3.0,
+        };
+      }
 
-    setTimeout(() => {
-      setCurrentScreen('expense-list');
-    }, 1200);
+      if (hasReceipt && receiptImage) {
+        expensePayload.receiptImage = receiptImage;
+        if (receiptFileName) {
+          expensePayload.receiptFileName = receiptFileName;
+        }
+      }
+
+      await addExpenseEntry(expensePayload);
+
+      const otherPartner = isPartner2(canonicalPayer) ? p1Name : p2Name;
+      setToastMessage(`Expense Recorded for ${canonicalPayer} • Synced with ${otherPartner}`);
+
+      setTimeout(() => {
+        setCurrentScreen('expense-list');
+      }, 1000);
+    } catch (err) {
+      console.error('Failed to save expense:', err);
+      alert('Failed to save expense. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSimulatePhotoUpload = () => {
@@ -197,12 +224,12 @@ export const AddExpense: React.FC = () => {
           </span>
         </label>
         <div className="grid grid-cols-2 gap-3" id="partner-selector">
-          {/* Partner Anand */}
+          {/* Partner 1 */}
           <button
             type="button"
-            onClick={() => setPayer('anand')}
+            onClick={() => setPayer(p1Name)}
             className={`relative flex flex-col items-start p-3.5 rounded-2xl text-left transition-all shadow-xs active:scale-[0.98] border-2 cursor-pointer ${
-              payer === 'anand'
+              isPartner1(payer)
                 ? 'bg-secondary-container/50 border-secondary'
                 : 'bg-surface-container-lowest border-transparent'
             }`}
@@ -210,7 +237,7 @@ export const AddExpense: React.FC = () => {
             <div className="flex items-center justify-between w-full mb-1.5">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center shadow-xs ${
-                  payer === 'anand'
+                  isPartner1(payer)
                     ? 'bg-secondary text-on-secondary'
                     : 'bg-surface-container-highest text-on-surface-variant'
                 }`}
@@ -219,7 +246,7 @@ export const AddExpense: React.FC = () => {
                   person
                 </span>
               </div>
-              {payer === 'anand' && (
+              {isPartner1(payer) && (
                 <span className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-xs">
                   <span className="material-symbols-outlined text-[16px] font-bold">
                     check
@@ -228,19 +255,19 @@ export const AddExpense: React.FC = () => {
               )}
             </div>
             <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Anand (You)
+              {p1Name}
             </span>
             <span className="font-label-sm text-label-sm text-on-secondary-container mt-0.5 font-bold text-xs">
-              Paid cash / card
+              Paid from pocket
             </span>
           </button>
 
-          {/* Partner Boopathi */}
+          {/* Partner 2 */}
           <button
             type="button"
-            onClick={() => setPayer('boopathi')}
+            onClick={() => setPayer(p2Name)}
             className={`relative flex flex-col items-start p-3.5 rounded-2xl text-left transition-all shadow-xs active:scale-[0.98] border-2 cursor-pointer ${
-              payer === 'boopathi'
+              isPartner2(payer)
                 ? 'bg-secondary-container/50 border-secondary'
                 : 'bg-surface-container-lowest border-transparent'
             }`}
@@ -248,7 +275,7 @@ export const AddExpense: React.FC = () => {
             <div className="flex items-center justify-between w-full mb-1.5">
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center shadow-xs ${
-                  payer === 'boopathi'
+                  isPartner2(payer)
                     ? 'bg-secondary text-on-secondary'
                     : 'bg-surface-container-highest text-on-surface-variant'
                 }`}
@@ -257,7 +284,7 @@ export const AddExpense: React.FC = () => {
                   person
                 </span>
               </div>
-              {payer === 'boopathi' && (
+              {isPartner2(payer) && (
                 <span className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-on-secondary shadow-xs">
                   <span className="material-symbols-outlined text-[16px] font-bold">
                     check
@@ -266,10 +293,16 @@ export const AddExpense: React.FC = () => {
               )}
             </div>
             <span className="font-headline-sm text-headline-sm text-on-surface font-bold">
-              Boopathi
+              {p2Name}
             </span>
-            <span className="font-label-sm text-label-sm text-on-surface-variant mt-0.5 text-xs font-medium">
-              Dual Partner
+            <span
+              className={`font-label-sm text-label-sm mt-0.5 text-xs ${
+                isPartner2(payer)
+                  ? 'text-on-secondary-container font-bold'
+                  : 'text-on-surface-variant font-medium'
+              }`}
+            >
+              Paid from pocket
             </span>
           </button>
         </div>
@@ -649,12 +682,17 @@ export const AddExpense: React.FC = () => {
       <div className="px-4 sm:px-6 mt-2 flex flex-col gap-2">
         <button
           type="button"
+          disabled={isSaving}
           onClick={handleSave}
-          className="w-full h-14 rounded-full bg-secondary text-on-secondary font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all cursor-pointer"
+          className="w-full h-14 rounded-full bg-secondary text-on-secondary font-label-lg text-label-lg font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50"
         >
-          <span className="material-symbols-outlined text-[22px]">save</span>
+          <span className="material-symbols-outlined text-[22px]">
+            {isSaving ? 'hourglass_top' : 'save'}
+          </span>
           <span>
-            Save Expense (₹ {Number(amount).toLocaleString('en-IN')})
+            {isSaving
+              ? 'Saving Expense...'
+              : `Save Expense (₹ ${Number(amount).toLocaleString('en-IN')})`}
           </span>
         </button>
 
@@ -663,8 +701,8 @@ export const AddExpense: React.FC = () => {
             info
           </span>
           <span className="font-body-sm text-body-sm text-xs">
-            Will be added to {payer === 'anand' ? 'Anand' : 'Boopathi'}'s
-            expense account and monthly report
+            Will be added to {isPartner1(payer) ? p1Name : p2Name}'s
+            expense account and partnership ledger
           </span>
         </div>
       </div>
@@ -684,7 +722,7 @@ export const AddExpense: React.FC = () => {
               </span>
               <span className="font-body-sm text-body-sm text-inverse-on-surface/80 text-xs">
                 Ledger synchronized with{' '}
-                {payer === 'anand' ? 'Boopathi' : 'Anand'}
+                {isPartner1(payer) ? p2Name : p1Name}
               </span>
             </div>
           </div>

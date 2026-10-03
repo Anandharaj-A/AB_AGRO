@@ -50,6 +50,14 @@ export type PaymentMode = string;
 export type PartnerId = string;
 export type ExpenseCategory = string;
 
+export interface WorkPayment {
+  id: string;
+  amount: number;
+  receivedBy: string;
+  date: string;
+  mode?: string;
+}
+
 export interface WorkEntry extends AuditMetadata {
   id: string;
   farmerName: string;
@@ -75,6 +83,7 @@ export interface WorkEntry extends AuditMetadata {
   remarks?: string;
   receiptNumber?: string;
   verified?: boolean;
+  payments?: WorkPayment[];
 }
 
 export interface FuelLogDetails {

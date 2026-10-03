@@ -25,6 +25,7 @@ import {
 } from '../utils/dateUtils';
 import {
   WorkEntry,
+  WorkPayment,
   ExpenseEntry,
   DriverShift,
   DriverAdvance,
@@ -121,19 +122,56 @@ interface HarvesterContextType {
   pendingCount: number;
   totalWorkCount: number;
   totalExpenses: number;
+  billedProfit: number;
+  cashProfit: number;
   netProfit: number;
+  profitViewMode: 'cash' | 'billed';
+  setProfitViewMode: (mode: 'cash' | 'billed') => void;
   netProfitPartner1: number;
   netProfitPartner2: number;
+  p1Name: string;
+  p2Name: string;
+  isPartner1: (name?: string) => boolean;
+  isPartner2: (name?: string) => boolean;
   partner1Spent: number;
   partner2Spent: number;
+  partner1Received: number;
+  partner2Received: number;
   partner1Collected: number;
   partner2Collected: number;
+  partner1SettledOut: number;
+  partner1SettledIn: number;
+  partner2SettledOut: number;
+  partner2SettledIn: number;
+  netAnand: number;
+  netBoopathi: number;
+  totalNet: number;
+  fairShareAnand: number;
+  fairShareBoopathi: number;
+  anandOwes: number;
+  settlementDirective: {
+    from: string;
+    to: string;
+    amount: number;
+    isSettled: boolean;
+    text: string;
+  };
   settlementOwed: {
     from: string;
     to: string;
     amount: number;
     difference: number;
   };
+  billedShare1: number;
+  billedShare2: number;
+  cashShare1: number;
+  cashShare2: number;
+  pendingShare1: number;
+  pendingShare2: number;
+  partner1AdvanceDeducted: number;
+  partner2AdvanceDeducted: number;
+  partner1RemainingShare: number;
+  partner2RemainingShare: number;
   // Navigation & partner view
   setCurrentScreen: (screen: ScreenType) => void;
   setSelectedDate: (date: string) => void;
@@ -145,7 +183,7 @@ interface HarvesterContextType {
   addWorkEntry: (entry: Omit<WorkEntry, 'id'>) => Promise<void>;
   updateWorkEntry: (id: string, entry: Partial<WorkEntry>) => Promise<void>;
   deleteWorkEntry: (id: string) => Promise<void>;
-  recordPayment: (workId: string, amount: number, collectedBy: string) => Promise<void>;
+  recordPayment: (workId: string, amount: number, collectedBy: string, paymentMode?: string) => Promise<void>;
   // CRUD - Expenses
   addExpenseEntry: (entry: Omit<ExpenseEntry, 'id'>) => Promise<void>;
   updateExpenseEntry: (id: string, entry: Partial<ExpenseEntry>) => Promise<void>;
@@ -166,7 +204,7 @@ interface HarvesterContextType {
   updateMachineCare: (id: string, care: Partial<MachineCareEntry>) => Promise<void>;
   deleteMachineCare: (id: string) => Promise<void>;
   // Settlements
-  settlePartnerAccount: (notes?: string) => Promise<void>;
+  settlePartnerAccount: (fromPartner?: string, toPartner?: string, amount?: number, notes?: string) => Promise<void>;
   deleteSettlement: (id: string) => Promise<void>;
   // Settings
   updateBusinessSettings: (settings: Partial<BusinessSettings>) => Promise<void>;
@@ -199,6 +237,7 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [selectedMonth, setSelectedMonth] = useState<string>(formatMonthYear(now));
   const [dateFilterMode, setDateFilterMode] = useState<'month' | 'day' | 'all'>('month');
   const [activePartnerView, setActivePartnerView] = useState<string>('Anand');
+  const [profitViewMode, setProfitViewMode] = useState<'cash' | 'billed'>('cash');
 
   const stepDate = (direction: -1 | 1) => {
     if (dateFilterMode === 'day') {
@@ -345,41 +384,168 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const pendingCount = filteredWorkEntries.filter((w) => (w.balanceAmount || 0) > 0).length;
 
   const totalExpenses = filteredExpenseEntries.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const netProfit = totalIncome - totalExpenses;
+  const billedProfit = totalIncome - totalExpenses; // Billed profit = total billed − expenses
+  const cashProfit = totalReceived - totalExpenses; // Cash profit = total received − expenses
 
-  const share1Ratio = (businessSettings.profitSharePartner1 || 50) / 100;
-  const share2Ratio = (businessSettings.profitSharePartner2 || 50) / 100;
-  const netProfitPartner1 = Math.round(netProfit * share1Ratio);
-  const netProfitPartner2 = Math.round(netProfit * share2Ratio);
+  const p1Name = (businessSettings.partner1Name || 'Anand').trim();
+  const p2Name = (businessSettings.partner2Name || 'Boopathi').trim();
 
-  const p1Name = businessSettings.partner1Name || 'Anand';
-  const p2Name = businessSettings.partner2Name || 'Boopathi';
+  const isPartner1 = (name?: string): boolean => {
+    if (!name) return false;
+    const n = name.trim().toLowerCase();
+    const p1 = p1Name.toLowerCase();
+    return n === p1 || n === 'anand' || n === 'partner 1' || n === 'partner1';
+  };
 
+  const isPartner2 = (name?: string): boolean => {
+    if (!name) return false;
+    const n = name.trim().toLowerCase();
+    const p2 = p2Name.toLowerCase();
+    return n === p2 || n === 'boopathi' || n === 'partner 2' || n === 'partner2';
+  };
+
+  // Cash received per partner across all jobs and payments
+  let partner1Received = 0;
+  let partner2Received = 0;
+
+  workEntries.forEach((w) => {
+    if (w.payments && w.payments.length > 0) {
+      w.payments.forEach((p) => {
+        const amt = Number(p.amount) || 0;
+        if (isPartner2(p.receivedBy)) {
+          partner2Received += amt;
+        } else {
+          partner1Received += amt;
+        }
+      });
+    } else {
+      const amt = Number(w.receivedAmount) || 0;
+      if (amt > 0) {
+        if (isPartner2(w.receivedBy)) {
+          partner2Received += amt;
+        } else {
+          partner1Received += amt;
+        }
+      }
+    }
+  });
+
+  const partner1Collected = partner1Received;
+  const partner2Collected = partner2Received;
+
+  // Expenses spent from pocket per partner
   const partner1Spent = expenseEntries
-    .filter((e) => (e.paidBy || '').toLowerCase() === p1Name.toLowerCase())
+    .filter((e) => isPartner1(e.paidBy))
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const partner2Spent = expenseEntries
-    .filter((e) => (e.paidBy || '').toLowerCase() === p2Name.toLowerCase())
+    .filter((e) => isPartner2(e.paidBy))
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  const partner1Collected = workEntries
-    .filter((w) => (w.receivedBy || '').toLowerCase() === p1Name.toLowerCase())
-    .reduce((sum, w) => sum + (Number(w.receivedAmount) || 0), 0);
+  // Settlement transfers between partners
+  const partner1SettledOut = settlements
+    .filter((s) => isPartner1(s.fromPartner))
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
-  const partner2Collected = workEntries
-    .filter((w) => (w.receivedBy || '').toLowerCase() === p2Name.toLowerCase())
-    .reduce((sum, w) => sum + (Number(w.receivedAmount) || 0), 0);
+  const partner1SettledIn = settlements
+    .filter((s) => isPartner1(s.toPartner))
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
-  // Equalization logic:
-  // If Partner 1 spent more, Partner 2 owes Partner 1 difference * share2Ratio
-  const difference = partner1Spent - partner2Spent;
-  const settlementOwed = {
-    from: difference >= 0 ? p2Name : p1Name,
-    to: difference >= 0 ? p1Name : p2Name,
-    amount: Math.round(Math.abs(difference) * (difference >= 0 ? share2Ratio : share1Ratio)),
-    difference: Math.abs(difference),
+  const partner2SettledOut = settlements
+    .filter((s) => isPartner2(s.fromPartner))
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+
+  const partner2SettledIn = settlements
+    .filter((s) => isPartner2(s.toPartner))
+    .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+
+  // Net cash position per partner:
+  // net = received - spent - settledOut + settledIn;
+  const netAnand = partner1Received - partner1Spent - partner1SettledOut + partner1SettledIn;
+  const netBoopathi = partner2Received - partner2Spent - partner2SettledOut + partner2SettledIn;
+
+  // totals
+  const totalNet = netAnand + netBoopathi;
+
+  const share1Ratio = (businessSettings.profitSharePartner1 || 50) / 100;
+  const share2Ratio = (businessSettings.profitSharePartner2 || 50) / 100;
+
+  const fairShareAnand = totalNet * share1Ratio;
+  const fairShareBoopathi = totalNet * share2Ratio;
+
+  // positive = Anand holds extra money and must pay Boopathi
+  // negative = Boopathi holds extra money and must pay Anand
+  const anandOwes = Math.round(netAnand - fairShareAnand);
+
+  let settlementDirective: {
+    from: string;
+    to: string;
+    amount: number;
+    isSettled: boolean;
+    text: string;
   };
+
+  if (anandOwes > 0) {
+    settlementDirective = {
+      from: p1Name,
+      to: p2Name,
+      amount: anandOwes,
+      isSettled: false,
+      text: `${p1Name} pays ${p2Name} ₹ ${anandOwes.toLocaleString('en-IN')}`,
+    };
+  } else if (anandOwes < 0) {
+    settlementDirective = {
+      from: p2Name,
+      to: p1Name,
+      amount: Math.abs(anandOwes),
+      isSettled: false,
+      text: `${p2Name} pays ${p1Name} ₹ ${Math.abs(anandOwes).toLocaleString('en-IN')}`,
+    };
+  } else {
+    settlementDirective = {
+      from: p1Name,
+      to: p2Name,
+      amount: 0,
+      isSettled: true,
+      text: 'Settled',
+    };
+  }
+
+  const settlementOwed = {
+    from: settlementDirective.from,
+    to: settlementDirective.to,
+    amount: settlementDirective.amount,
+    difference: Math.abs(partner1Spent - partner2Spent),
+  };
+
+  // Profit calculations based on active view mode
+  const netProfit = profitViewMode === 'billed' ? billedProfit : cashProfit;
+
+  const billedShare1 = Math.round(billedProfit * share1Ratio);
+  const billedShare2 = Math.round(billedProfit * share2Ratio);
+
+  const cashShare1 = Math.round(cashProfit * share1Ratio);
+  const cashShare2 = Math.round(cashProfit * share2Ratio);
+
+  const pendingShare1 = Math.round(totalPending * share1Ratio);
+  const pendingShare2 = Math.round(totalPending * share2Ratio);
+
+  // Remaining profit to be distributed:
+  // When accounts are settled, each partner has already pocketed their full share of current cash profit.
+  // Any remaining profit comes from uncollected dues from farmers.
+  const partner1RemainingShare = settlementDirective.isSettled
+    ? pendingShare1
+    : Math.max(0, cashShare1 - netAnand) + pendingShare1;
+
+  const partner2RemainingShare = settlementDirective.isSettled
+    ? pendingShare2
+    : Math.max(0, cashShare2 - netBoopathi) + pendingShare2;
+
+  const partner1AdvanceDeducted = partner1Received;
+  const partner2AdvanceDeducted = partner2Received;
+
+  const netProfitPartner1 = profitViewMode === 'billed' ? billedShare1 : Math.round(cashProfit * share1Ratio);
+  const netProfitPartner2 = profitViewMode === 'billed' ? billedShare2 : Math.round(cashProfit * share2Ratio);
 
   const getAuditStamp = (isEdit: boolean = false) => {
     const now = new Date().toISOString();
@@ -400,6 +566,23 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   };
 
+  // Helper to remove any undefined values before writing to Firestore
+  const stripUndefined = <T,>(obj: T): T => {
+    if (obj === null || obj === undefined || typeof obj !== 'object') {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => stripUndefined(item)) as unknown as T;
+    }
+    const clean: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        clean[key] = stripUndefined(value);
+      }
+    }
+    return clean as T;
+  };
+
   // CRUD Implementations
   const addWorkEntry = async (entry: Omit<WorkEntry, 'id'>) => {
     const newDocRef = doc(collection(db, 'works'));
@@ -409,16 +592,16 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       receiptNumber: entry.receiptNumber || `HB-2024-${Math.floor(100 + Math.random() * 900)}`,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, workData);
+    await setDoc(newDocRef, stripUndefined(workData));
     await logActivity(appUser, 'create', 'work', `Created work for ${entry.farmerName} (₹ ${entry.totalAmount})`, newDocRef.id, entry.farmerName);
   };
 
   const updateWorkEntry = async (id: string, entry: Partial<WorkEntry>) => {
     const docRef = doc(db, 'works', id);
-    const updatePayload = {
+    const updatePayload = stripUndefined({
       ...entry,
       ...getAuditStamp(true),
-    };
+    });
     await updateDoc(docRef, updatePayload);
     await logActivity(appUser, 'update', 'work', `Updated work entry ${entry.farmerName || id}`, id, entry.farmerName);
   };
@@ -438,39 +621,100 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  const recordPayment = async (workId: string, amount: number, collectedBy: string) => {
+  const recordPayment = async (workId: string, amount: number, collectedBy: string, paymentMode: string = 'cash') => {
     const work = workEntries.find((w) => w.id === workId);
     if (!work) return;
+
+    const canonicalCollector = isPartner2(collectedBy) ? p2Name : p1Name;
     const newReceived = (Number(work.receivedAmount) || 0) + amount;
     const newBalance = Math.max(0, (Number(work.totalAmount) || 0) - newReceived);
     const newStatus = newBalance === 0 ? 'paid' : 'partly_paid';
+
+    const newPayment: WorkPayment = {
+      id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      amount,
+      receivedBy: canonicalCollector,
+      date: formatDisplayDate(new Date()),
+      mode: paymentMode,
+    };
+
+    const existingPayments: WorkPayment[] = work.payments && work.payments.length > 0
+      ? [...work.payments]
+      : (Number(work.receivedAmount) || 0) > 0
+        ? [
+            {
+              id: `init-${work.id}`,
+              amount: Number(work.receivedAmount) || 0,
+              receivedBy: isPartner2(work.receivedBy) ? p2Name : p1Name,
+              date: work.date,
+              mode: work.paymentMode || 'cash',
+            },
+          ]
+        : [];
+
+    const updatedPayments = [...existingPayments, newPayment];
+
     await updateWorkEntry(workId, {
       receivedAmount: newReceived,
       balanceAmount: newBalance,
       status: newStatus,
-      receivedBy: collectedBy,
+      receivedBy: canonicalCollector,
+      payments: updatedPayments,
     });
-    await logActivity(appUser, 'update', 'work', `Collected ₹ ${amount} cash from ${work.farmerName} by ${collectedBy}`, workId, work.farmerName);
+    await logActivity(
+      appUser,
+      'update',
+      'work',
+      `Collected ₹ ${amount} cash from ${work.farmerName} by ${canonicalCollector}`,
+      workId,
+      work.farmerName
+    );
   };
 
   const addExpenseEntry = async (entry: Omit<ExpenseEntry, 'id'>) => {
+    const canonicalPayer = isPartner2(entry.paidBy) ? p2Name : p1Name;
     const newDocRef = doc(collection(db, 'expenses'));
     const expData: ExpenseEntry = {
       ...entry,
+      paidBy: canonicalPayer,
       id: newDocRef.id,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, expData);
-    await logActivity(appUser, 'create', 'expense', `Added ${entry.category} expense ₹ ${entry.amount} paid by ${entry.paidBy}`, newDocRef.id, entry.category);
+    const sanitized = stripUndefined(expData);
+    // Optimistic update
+    setExpenseEntries((prev) => [sanitized, ...prev]);
+    await setDoc(newDocRef, sanitized);
+    await logActivity(
+      appUser,
+      'create',
+      'expense',
+      `Added ${entry.category} expense ₹ ${entry.amount} paid by ${canonicalPayer}`,
+      newDocRef.id,
+      entry.category
+    );
   };
 
   const updateExpenseEntry = async (id: string, entry: Partial<ExpenseEntry>) => {
-    const docRef = doc(db, 'expenses', id);
-    await updateDoc(docRef, {
+    const updatedEntry = {
       ...entry,
+      ...(entry.paidBy ? { paidBy: isPartner2(entry.paidBy) ? p2Name : p1Name } : {}),
+    };
+    const sanitized = stripUndefined({
+      ...updatedEntry,
       ...getAuditStamp(true),
     });
-    await logActivity(appUser, 'update', 'expense', `Updated expense entry ${id} (₹ ${entry.amount || ''})`, id, entry.category);
+    // Optimistic update
+    setExpenseEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...sanitized } : e)));
+    const docRef = doc(db, 'expenses', id);
+    await updateDoc(docRef, sanitized);
+    await logActivity(
+      appUser,
+      'update',
+      'expense',
+      `Updated expense entry ${id} (₹ ${entry.amount || ''})`,
+      id,
+      entry.category
+    );
   };
 
   const deleteExpenseEntry = async (id: string) => {
@@ -495,16 +739,16 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: newDocRef.id,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, drvData);
+    await setDoc(newDocRef, stripUndefined(drvData));
     await logActivity(appUser, 'create', 'driver', `Added driver ${driver.driverName}`, newDocRef.id, driver.driverName);
   };
 
   const updateDriver = async (id: string, driver: Partial<DriverShift>) => {
     const docRef = doc(db, 'drivers', id);
-    await updateDoc(docRef, {
+    await updateDoc(docRef, stripUndefined({
       ...driver,
       ...getAuditStamp(true),
-    });
+    }));
     await logActivity(appUser, 'update', 'driver', `Updated driver ${driver.driverName || id}`, id, driver.driverName);
   };
 
@@ -521,15 +765,15 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: newDocRef.id,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, data);
+    await setDoc(newDocRef, stripUndefined(data));
     await logActivity(appUser, 'create', 'driver_advance', `Gave ₹ ${adv.amount} advance to ${adv.driverName}`, newDocRef.id, adv.driverName);
   };
 
   const updateDriverAdvance = async (id: string, adv: Partial<DriverAdvance>) => {
-    await updateDoc(doc(db, 'driver_advances', id), {
+    await updateDoc(doc(db, 'driver_advances', id), stripUndefined({
       ...adv,
       ...getAuditStamp(true),
-    });
+    }));
     await logActivity(appUser, 'update', 'driver_advance', `Updated advance for ${adv.driverName || id}`, id);
   };
 
@@ -545,15 +789,15 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: newDocRef.id,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, data);
+    await setDoc(newDocRef, stripUndefined(data));
     await logActivity(appUser, 'create', 'driver_salary', `Settled ₹ ${sal.netPaid} salary for ${sal.driverName}`, newDocRef.id, sal.driverName);
   };
 
   const updateDriverSalary = async (id: string, sal: Partial<DriverSalary>) => {
-    await updateDoc(doc(db, 'driver_salaries', id), {
+    await updateDoc(doc(db, 'driver_salaries', id), stripUndefined({
       ...sal,
       ...getAuditStamp(true),
-    });
+    }));
     await logActivity(appUser, 'update', 'driver_salary', `Updated salary for ${sal.driverName || id}`, id);
   };
 
@@ -569,15 +813,15 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       id: newDocRef.id,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, data);
+    await setDoc(newDocRef, stripUndefined(data));
     await logActivity(appUser, 'create', 'machine_care', `Recorded ${care.careType} at ${care.engineHours} hrs (₹ ${care.cost})`, newDocRef.id, care.careType);
   };
 
   const updateMachineCare = async (id: string, care: Partial<MachineCareEntry>) => {
-    await updateDoc(doc(db, 'machine_care', id), {
+    await updateDoc(doc(db, 'machine_care', id), stripUndefined({
       ...care,
       ...getAuditStamp(true),
-    });
+    }));
     await logActivity(appUser, 'update', 'machine_care', `Updated maintenance record ${care.careType || id}`, id);
   };
 
@@ -586,42 +830,53 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     await logActivity(appUser, 'delete', 'machine_care', `Deleted machine care entry ${id}`, id);
   };
 
-  const settlePartnerAccount = async (notes?: string) => {
-    if (settlementOwed.amount <= 0) return;
+  const settlePartnerAccount = async (fromPartner?: string, toPartner?: string, amount?: number, notes?: string) => {
+    const fromP = fromPartner || settlementDirective.from;
+    const toP = toPartner || settlementDirective.to;
+    const amt = amount !== undefined ? amount : settlementDirective.amount;
+
+    if (amt <= 0) return;
+
     const newDocRef = doc(collection(db, 'settlements'));
     const newSettlement: SettlementRecord = {
       id: newDocRef.id,
-      date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      fromPartner: settlementOwed.from,
-      toPartner: settlementOwed.to,
-      amount: settlementOwed.amount,
-      notes: notes || 'Partner equalized payout',
+      date: formatDisplayDate(new Date()),
+      fromPartner: fromP,
+      toPartner: toP,
+      amount: amt,
+      notes: notes || `Partner Equalization Settlement: ${fromP} paid ${toP} ₹${amt}`,
       ...getAuditStamp(false),
     };
-    await setDoc(newDocRef, newSettlement);
 
-    // Also insert adjustment expense
-    await addExpenseEntry({
-      date: newSettlement.date,
-      paidBy: settlementOwed.from,
-      category: 'other',
-      amount: settlementOwed.difference,
-      paymentMode: 'upi',
-      remarks: `Partner Settlement Payout to ${settlementOwed.to} (Equalized Shares)`,
-      machinery: businessSettings.harvesterModel,
-      verified: true,
-    });
+    const sanitized = stripUndefined(newSettlement);
+    // Optimistic update
+    setSettlements((prev) => [sanitized, ...prev]);
 
-    await logActivity(appUser, 'settle', 'work', `${settlementOwed.from} paid ${settlementOwed.to} ₹ ${settlementOwed.amount} to settle up`, newDocRef.id);
+    await setDoc(newDocRef, sanitized);
+    await logActivity(
+      appUser,
+      'settle',
+      'work',
+      `${fromP} paid ${toP} ₹ ${amt} to settle up`,
+      newDocRef.id
+    );
   };
 
   const deleteSettlement = async (id: string) => {
-    await deleteDoc(doc(db, 'settlements', id));
-    await logActivity(appUser, 'delete', 'work', `Deleted settlement record ${id}`, id);
+    const item = settlements.find((s) => s.id === id);
+    setSettlements((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await deleteDoc(doc(db, 'settlements', id));
+      await logActivity(appUser, 'delete', 'work', `Deleted settlement record ${id}`, id);
+    } catch (err) {
+      console.error('Failed to delete settlement doc:', err);
+      if (item) setSettlements((prev) => [...prev, item]);
+      throw err;
+    }
   };
 
   const updateBusinessSettings = async (settings: Partial<BusinessSettings>) => {
-    const updated = { ...businessSettings, ...settings };
+    const updated = stripUndefined({ ...businessSettings, ...settings });
     await setDoc(doc(db, 'settings', 'business'), updated);
     await logActivity(appUser, 'update', 'settings', `Updated business profile & partners`);
   };
@@ -725,14 +980,45 @@ export const HarvesterProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         pendingCount,
         totalWorkCount,
         totalExpenses,
+        billedProfit,
+        cashProfit,
         netProfit,
+        profitViewMode,
+        setProfitViewMode,
         netProfitPartner1,
         netProfitPartner2,
+        p1Name,
+        p2Name,
+        isPartner1,
+        isPartner2,
         partner1Spent,
         partner2Spent,
+        partner1Received,
+        partner2Received,
         partner1Collected,
         partner2Collected,
+        partner1SettledOut,
+        partner1SettledIn,
+        partner2SettledOut,
+        partner2SettledIn,
+        netAnand,
+        netBoopathi,
+        totalNet,
+        fairShareAnand,
+        fairShareBoopathi,
+        anandOwes,
+        settlementDirective,
         settlementOwed,
+        billedShare1,
+        billedShare2,
+        cashShare1,
+        cashShare2,
+        pendingShare1,
+        pendingShare2,
+        partner1AdvanceDeducted,
+        partner2AdvanceDeducted,
+        partner1RemainingShare,
+        partner2RemainingShare,
         setCurrentScreen,
         setSelectedDate,
         setSelectedMonth,
